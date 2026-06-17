@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 /* ──────────────────────────────────────────────────────────────
    CONFIG — replace with your real WhatsApp number (country code,
@@ -89,6 +89,13 @@ const SECTIONS = [
         options: ETHNIC_GROUPS,
       },
       {
+        // Only shown when "OTHER / AUTRE" is selected above.
+        name: "otherEthnicGroup",
+        label: "Specify ethnic group / Préciser le groupe ethnique",
+        type: "text",
+        showIf: (f) => f.ethnicGroup === "OTHER",
+      },
+      {
         name: "mobilePhone",
         label: "Mobile phone / Téléphone portable",
         type: "tel",
@@ -158,10 +165,6 @@ const SECTIONS = [
   },
 ];
 
-/* Flat, ordered list of every field name — used for validation order
-   and for scrolling to the first empty field. */
-const FIELD_ORDER = SECTIONS.flatMap((s) => s.fields.map((f) => f.name));
-
 const INITIAL_FORM = {
   givenNames: "",
   surname: "",
@@ -172,6 +175,7 @@ const INITIAL_FORM = {
   specialMarks: "NIL",
   cameroonianBy: "",
   ethnicGroup: "",
+  otherEthnicGroup: "",
   mobilePhone: "",
   dateOfBirth: "",
   birthCountry: "CAMEROON",
@@ -209,7 +213,9 @@ function buildMessage(f) {
     `Complexion: ${f.complexion}`,
     `Special marks: ${f.specialMarks}`,
     `Cameroonian By: ${f.cameroonianBy}`,
-    `Ethnic Group: ${f.ethnicGroup}`,
+    `Ethnic Group: ${
+      f.ethnicGroup === "OTHER" ? f.otherEthnicGroup : f.ethnicGroup
+    }`,
     `Mobile phone: ${f.mobilePhone}`,
     `Date of birth: ${formatDob(f.dateOfBirth)}`,
     `Birth Country: ${f.birthCountry}`,
@@ -264,58 +270,25 @@ const WhatsAppIcon = () => (
 
 export default function App() {
   const [form, setForm] = useState(INITIAL_FORM);
-  const [errors, setErrors] = useState({});
-  const [showSummaryError, setShowSummaryError] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const refs = useRef({});
 
   const setField = (name, value) => {
     setForm((prev) => ({ ...prev, [name]: value }));
-    // Clear this field's error as the user types.
-    setErrors((prev) => {
-      if (!prev[name]) return prev;
-      const next = { ...prev };
-      delete next[name];
-      return next;
-    });
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
-    const newErrors = {};
-    FIELD_ORDER.forEach((name) => {
-      if (!String(form[name]).trim()) {
-        newErrors[name] = "Required / Obligatoire";
-      }
-    });
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      setShowSummaryError(true);
-      const firstInvalid = FIELD_ORDER.find((n) => newErrors[n]);
-      const el = refs.current[firstInvalid];
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        if (typeof el.focus === "function") el.focus({ preventScroll: true });
-      }
-      return;
-    }
-
     const message = buildMessage(form);
     window.open(
       `https://wa.me/${YOUR_WHATSAPP}?text=${encodeURIComponent(message)}`,
       "_blank",
       "noopener,noreferrer"
     );
-    setShowSummaryError(false);
     setSubmitted(true);
   };
 
   const handleReset = () => {
     setForm(INITIAL_FORM);
-    setErrors({});
-    setShowSummaryError(false);
     setSubmitted(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -348,17 +321,15 @@ export default function App() {
   }
 
   const renderField = (field) => {
-    const { name, label, type, options, full } = field;
-    const hasError = Boolean(errors[name]);
-    const inputClass = `mc-input${hasError ? " mc-input-error" : ""}`;
+    const { name, label, type, options, full, showIf } = field;
+    if (showIf && !showIf(form)) return null;
 
     let control;
     if (type === "select") {
       control = (
         <select
           id={name}
-          ref={(el) => (refs.current[name] = el)}
-          className={inputClass}
+          className="mc-input"
           value={form[name]}
           onChange={(e) => setField(name, e.target.value)}
         >
@@ -374,11 +345,7 @@ export default function App() {
       );
     } else if (type === "gender") {
       control = (
-        <div
-          className={`mc-toggle${hasError ? " has-error" : ""}`}
-          ref={(el) => (refs.current[name] = el)}
-          tabIndex={-1}
-        >
+        <div className="mc-toggle" tabIndex={-1}>
           {[
             { value: "MALE", label: "MALE / MASCULIN" },
             { value: "FEMALE", label: "FEMALE / FÉMININ" },
@@ -400,8 +367,7 @@ export default function App() {
       control = (
         <input
           id={name}
-          ref={(el) => (refs.current[name] = el)}
-          className={inputClass}
+          className="mc-input"
           type={type}
           inputMode={type === "number" ? "numeric" : undefined}
           value={form[name]}
@@ -417,12 +383,8 @@ export default function App() {
       >
         <label className="mc-label" htmlFor={name}>
           {label}
-          <span className="mc-req" aria-hidden="true">
-            *
-          </span>
         </label>
         {control}
-        {hasError && <span className="mc-error">{errors[name]}</span>}
       </div>
     );
   };
@@ -437,19 +399,9 @@ export default function App() {
           <br />
           Remplissez les informations ci-dessous. À l'envoi, un message
           pré-formaté s'ouvre dans <strong>WhatsApp</strong>.
-          <br />
-          <span className="mc-required-note">
-            All fields are required. / Tous les champs sont obligatoires.
-          </span>
         </p>
 
         <form onSubmit={handleSubmit} noValidate>
-          {showSummaryError && (
-            <div className="mc-form-error">
-              Please fill in all fields. / Veuillez remplir tous les champs.
-            </div>
-          )}
-
           {SECTIONS.map((section) => (
             <section className="mc-card" key={section.title}>
               <h2 className="mc-section-title">{section.title}</h2>
