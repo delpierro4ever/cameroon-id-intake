@@ -7,30 +7,33 @@ import { useRef, useState } from "react";
 const YOUR_WHATSAPP = "237652301400";
 
 /* Reference data */
+// Dropdown options are { value, label }: `value` stays English (it is what
+// gets copied into the government portal via the WhatsApp message), while
+// `label` shows both languages on screen.
 const REGIONS = [
-  "Adamawa",
-  "Centre",
-  "East",
-  "Far North",
-  "Littoral",
-  "North",
-  "North-West",
-  "South",
-  "South-West",
-  "West",
+  { value: "Adamawa", label: "Adamawa / Adamaoua" },
+  { value: "Centre", label: "Centre" },
+  { value: "East", label: "East / Est" },
+  { value: "Far North", label: "Far North / Extrême-Nord" },
+  { value: "Littoral", label: "Littoral" },
+  { value: "North", label: "North / Nord" },
+  { value: "North-West", label: "North-West / Nord-Ouest" },
+  { value: "South", label: "South / Sud" },
+  { value: "South-West", label: "South-West / Sud-Ouest" },
+  { value: "West", label: "West / Ouest" },
 ];
 
 const ETHNIC_GROUPS = [
-  "BAMILEKE",
-  "BASSA",
-  "BETI",
-  "DUALA",
-  "FULFIDE",
-  "MBO",
-  "MAKA",
-  "TIKARI",
-  "HAUSA",
-  "OTHER",
+  { value: "BAMILEKE", label: "BAMILEKE" },
+  { value: "BASSA", label: "BASSA" },
+  { value: "BETI", label: "BETI" },
+  { value: "DOUALA", label: "DOUALA" },
+  { value: "FULFIDE", label: "FULFIDE" },
+  { value: "MBO", label: "MBO" },
+  { value: "MAKA", label: "MAKA" },
+  { value: "TIKARI", label: "TIKARI" },
+  { value: "HAUSA", label: "HAUSA" },
+  { value: "OTHER", label: "OTHER / AUTRE" },
 ];
 
 /* Field definitions, grouped into the three sections.
@@ -46,14 +49,23 @@ const SECTIONS = [
         name: "maritalStatus",
         label: "Marital status / Situation matrimoniale",
         type: "select",
-        options: ["SINGLE", "MARRIED", "DIVORCED", "WIDOWED"],
+        options: [
+          { value: "SINGLE", label: "SINGLE / CÉLIBATAIRE" },
+          { value: "MARRIED", label: "MARRIED / MARIÉ(E)" },
+          { value: "DIVORCED", label: "DIVORCED / DIVORCÉ(E)" },
+          { value: "WIDOWED", label: "WIDOWED / VEUF(VE)" },
+        ],
       },
       { name: "height", label: "Height (cm) / Taille (cm)", type: "number" },
       {
         name: "complexion",
         label: "Complexion / Teint",
         type: "select",
-        options: ["LIGHT", "MEDIUM", "DARK"],
+        options: [
+          { value: "LIGHT", label: "LIGHT / CLAIR" },
+          { value: "MEDIUM", label: "MEDIUM / MOYEN" },
+          { value: "DARK", label: "DARK / FONCÉ" },
+        ],
       },
       {
         name: "specialMarks",
@@ -64,7 +76,11 @@ const SECTIONS = [
         name: "cameroonianBy",
         label: "Cameroonian By / Camerounais par",
         type: "select",
-        options: ["Birth", "Afiliation", "Naturalization"],
+        options: [
+          { value: "Birth", label: "Birth / Naissance" },
+          { value: "Afiliation", label: "Afiliation / Filiation" },
+          { value: "Naturalization", label: "Naturalization / Naturalisation" },
+        ],
       },
       {
         name: "ethnicGroup",
@@ -350,8 +366,8 @@ export default function App() {
             Select… / Choisir…
           </option>
           {options.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
             </option>
           ))}
         </select>
@@ -401,6 +417,9 @@ export default function App() {
       >
         <label className="mc-label" htmlFor={name}>
           {label}
+          <span className="mc-req" aria-hidden="true">
+            *
+          </span>
         </label>
         {control}
         {hasError && <span className="mc-error">{errors[name]}</span>}
@@ -418,6 +437,10 @@ export default function App() {
           <br />
           Remplissez les informations ci-dessous. À l'envoi, un message
           pré-formaté s'ouvre dans <strong>WhatsApp</strong>.
+          <br />
+          <span className="mc-required-note">
+            All fields are required. / Tous les champs sont obligatoires.
+          </span>
         </p>
 
         <form onSubmit={handleSubmit} noValidate>

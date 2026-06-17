@@ -172,6 +172,19 @@ body {
   margin-bottom: 6px;
 }
 
+.mc-req {
+  color: var(--error);
+  margin-left: 3px;
+  font-weight: 700;
+}
+
+.mc-required-note {
+  display: inline-block;
+  margin-top: 6px;
+  font-weight: 600;
+  color: var(--red);
+}
+
 .mc-input {
   width: 100%;
   font-size: 15px;
