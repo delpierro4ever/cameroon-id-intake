@@ -6,6 +6,10 @@ import { useState } from "react";
    ────────────────────────────────────────────────────────────── */
 const YOUR_WHATSAPP = "237652301400";
 
+/* Apps Script Web App URL — paste your deployed /exec URL here.
+   Leave "" to disable Sheet saving (WhatsApp still works either way). */
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzGvsKbKtd1nZTPoctQW6Q9H8eophT_OB0PRWLzlbSNl2uKFXh80BVtJy-Ag94epDW0/exec";
+
 /* Reference data */
 // Dropdown options are { value, label }: `value` stays English (it is what
 // gets copied into the government portal via the WhatsApp message), while
@@ -257,6 +261,31 @@ function buildMessage(f) {
   return lines.join("\n");
 }
 
+/* Best-effort save to the Google Sheet. Fire-and-forget: any failure is
+   swallowed so the WhatsApp hand-off below is never blocked. */
+function saveSubmission(f) {
+  if (!APPS_SCRIPT_URL) return;
+  try {
+    fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      // text/plain keeps this a "simple" request (no CORS preflight).
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "addSubmission",
+        givenNames: f.givenNames,
+        surnames: f.surname,
+        // Combine the residential address fields into one readable value.
+        address: [f.resAddress, f.resLocation, f.resDepartment, f.resRegion, f.resCountry]
+          .filter(Boolean)
+          .join(", "),
+        mobilePhone: f.mobilePhone,
+      }),
+    }).catch(() => {});
+  } catch (_) {
+    /* never block submission */
+  }
+}
+
 function Header() {
   return (
     <header className="mc-header">
@@ -298,6 +327,7 @@ export default function App() {
   const handleSubmit = (e) => {
     e.preventDefault();
     const message = buildMessage(form);
+    saveSubmission(form);
     window.open(
       `https://wa.me/${YOUR_WHATSAPP}?text=${encodeURIComponent(message)}`,
       "_blank",
