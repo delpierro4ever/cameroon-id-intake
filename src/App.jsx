@@ -157,9 +157,19 @@ const SECTIONS = [
         type: "text",
       },
       {
+        name: "motherDateOfBirth",
+        label: "Mother's date of birth / Date de naissance de la mère",
+        type: "date",
+      },
+      {
         name: "fatherSurname",
         label: "Father's surname(s) / Nom(s) du père",
         type: "text",
+      },
+      {
+        name: "fatherDateOfBirth",
+        label: "Father's date of birth / Date de naissance du père",
+        type: "date",
       },
     ],
   },
@@ -189,7 +199,9 @@ const INITIAL_FORM = {
   resLocation: "",
   resAddress: "",
   motherSurname: "",
+  motherDateOfBirth: "",
   fatherSurname: "",
+  fatherDateOfBirth: "",
 };
 
 /* yyyy-mm-dd  ->  dd.mm.yyyy */
@@ -233,7 +245,9 @@ function buildMessage(f) {
     ``,
     `*── PARENT DATA ──*`,
     `Mother's surname(s): ${f.motherSurname}`,
+    `Mother's date of birth: ${formatDob(f.motherDateOfBirth)}`,
     `Father's surname(s): ${f.fatherSurname}`,
+    `Father's date of birth: ${formatDob(f.fatherDateOfBirth)}`,
   ];
   return lines.join("\n");
 }
