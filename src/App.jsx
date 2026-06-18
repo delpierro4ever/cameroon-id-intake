@@ -159,7 +159,8 @@ const SECTIONS = [
       {
         name: "motherDateOfBirth",
         label: "Mother's date of birth / Date de naissance de la mère",
-        type: "date",
+        type: "dob",
+        unknownKey: "motherDobUnknown",
       },
       {
         name: "fatherSurname",
@@ -169,7 +170,8 @@ const SECTIONS = [
       {
         name: "fatherDateOfBirth",
         label: "Father's date of birth / Date de naissance du père",
-        type: "date",
+        type: "dob",
+        unknownKey: "fatherDobUnknown",
       },
     ],
   },
@@ -200,14 +202,17 @@ const INITIAL_FORM = {
   resAddress: "",
   motherSurname: "",
   motherDateOfBirth: "",
+  motherDobUnknown: false,
   fatherSurname: "",
   fatherDateOfBirth: "",
+  fatherDobUnknown: false,
 };
 
-/* yyyy-mm-dd  ->  dd.mm.yyyy */
-function formatDob(iso) {
-  if (!iso) return "";
-  const [y, m, d] = iso.split("-");
+/* yyyy-mm-dd -> dd.mm.yyyy ; a bare year (e.g. "1965") is returned as-is */
+function formatDob(value) {
+  if (!value) return "";
+  if (!value.includes("-")) return value;
+  const [y, m, d] = value.split("-");
   return `${d}.${m}.${y}`;
 }
 
@@ -335,7 +340,7 @@ export default function App() {
   }
 
   const renderField = (field) => {
-    const { name, label, type, options, full, showIf } = field;
+    const { name, label, type, options, full, showIf, unknownKey } = field;
     if (showIf && !showIf(form)) return null;
 
     let control;
@@ -356,6 +361,48 @@ export default function App() {
             </option>
           ))}
         </select>
+      );
+    } else if (type === "dob") {
+      const unknown = form[unknownKey];
+      control = (
+        <div className="mc-dob">
+          {unknown ? (
+            <input
+              id={name}
+              className="mc-input"
+              type="number"
+              inputMode="numeric"
+              placeholder="Year / Année (e.g. 1965)"
+              min="1900"
+              max={new Date().getFullYear()}
+              value={form[name]}
+              onChange={(e) => setField(name, e.target.value)}
+            />
+          ) : (
+            <input
+              id={name}
+              className="mc-input"
+              type="date"
+              value={form[name]}
+              onChange={(e) => setField(name, e.target.value)}
+            />
+          )}
+          <button
+            type="button"
+            className={`mc-dob-unknown${unknown ? " active" : ""}`}
+            onClick={() =>
+              setForm((prev) => ({
+                ...prev,
+                [unknownKey]: !prev[unknownKey],
+                [name]: "",
+              }))
+            }
+          >
+            {unknown
+              ? "↩ I know the exact date / Je connais la date exacte"
+              : "I don't know — year only / Je ne sais pas — année seulement"}
+          </button>
+        </div>
       );
     } else if (type === "gender") {
       control = (
