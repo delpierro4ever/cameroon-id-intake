@@ -35,6 +35,10 @@ var SHEETS = {
     name: 'Registered',
     headers: ['id', 'timestamp', 'givenNames', 'surnames', 'address', 'mobilePhone', 'amountPaid', 'paidDate', 'status'],
   },
+  biometrics: {
+    name: 'Biometrics',
+    headers: ['id', 'clientId', 'name', 'phone', 'stationName', 'rdvDate', 'status'],
+  },
 };
 
 /** Run once from the editor to create the three tabs with headers. */
@@ -203,6 +207,45 @@ function addManual(p) {
   });
 }
 
+/* ---------- Biometrics ---------- */
+/* The client's biometrics rendez-vous at a police station. The date is chosen
+   by the client in the government portal; we enter it manually once confirmed.
+   Separate from Appointments (which is our own client meetings). */
+
+function addBiometrics(p) {
+  return appendObject('biometrics', {
+    id: newId(),
+    clientId: p.clientId || '',
+    name: p.name || '',
+    phone: p.phone || '',
+    stationName: p.stationName || '',
+    rdvDate: p.rdvDate || '',
+    status: 'Pending',
+  });
+}
+
+function listBiometrics() {
+  return readObjects('biometrics');
+}
+
+/** Update status and/or rdvDate by id (only the fields provided). */
+function updateBiometrics(p) {
+  var row = findSheetRowById('biometrics', p.id);
+  if (row < 0) throw new Error('Biometrics entry not found: ' + p.id);
+  var sheet = getSheet('biometrics');
+  var headers = SHEETS.biometrics.headers;
+  if (p.status !== undefined) sheet.getRange(row, headers.indexOf('status') + 1).setValue(p.status);
+  if (p.rdvDate !== undefined) sheet.getRange(row, headers.indexOf('rdvDate') + 1).setValue(p.rdvDate);
+  return { id: p.id, status: p.status, rdvDate: p.rdvDate };
+}
+
+function deleteBiometrics(p) {
+  var row = findSheetRowById('biometrics', p.id);
+  if (row < 0) throw new Error('Biometrics entry not found: ' + p.id);
+  getSheet('biometrics').deleteRow(row);
+  return { id: p.id, deleted: true };
+}
+
 /* ---------- dispatch ---------- */
 
 var ACTIONS = {
@@ -216,6 +259,10 @@ var ACTIONS = {
   confirmRegister: confirmRegister,
   listRegistered: listRegistered,
   addManual: addManual,
+  addBiometrics: addBiometrics,
+  listBiometrics: listBiometrics,
+  updateBiometrics: updateBiometrics,
+  deleteBiometrics: deleteBiometrics,
 };
 
 function handle(action, params) {

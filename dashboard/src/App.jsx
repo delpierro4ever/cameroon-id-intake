@@ -61,6 +61,8 @@ function Pill({ status }) {
       Done: "pill pill-green",
       Cancelled: "pill pill-red",
       Submitted: "pill pill-grey",
+      Pending: "pill pill-amber",
+      Reminded: "pill pill-grey",
     }[status] || "pill pill-grey";
   return <span className={cls}>{status}</span>;
 }
@@ -408,6 +410,8 @@ function Registered({ refreshKey }) {
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [manual, setManual] = useState({ name: "", phone: "", address: "", amountPaid: "", paidDate: TODAY });
+  const [bioOpenId, setBioOpenId] = useState(null);
+  const [bio, setBio] = useState({ stationName: "", rdvDate: "" });
 
   const load = async () => {
     setLoading(true);
@@ -433,6 +437,31 @@ function Registered({ refreshKey }) {
       setManual({ name: "", phone: "", address: "", amountPaid: "", paidDate: TODAY });
       setShowAdd(false);
       await load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openBio = (id) => {
+    setBioOpenId(id);
+    setBio({ stationName: "", rdvDate: "" });
+  };
+
+  const addBio = async (client) => {
+    if (!bio.rdvDate) return;
+    setBusy(true);
+    try {
+      await api("addBiometrics", {
+        clientId: client.id,
+        name: `${client.givenNames || ""} ${client.surnames || ""}`.trim(),
+        phone: client.mobilePhone,
+        stationName: bio.stationName,
+        rdvDate: bio.rdvDate,
+      });
+      setBioOpenId(null);
+      setBio({ stationName: "", rdvDate: "" });
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -549,8 +578,236 @@ function Registered({ refreshKey }) {
               📞 {r.mobilePhone || "—"} · 💰 paid {fmtDate(r.paidDate)}
             </div>
             {r.address ? <div className="muted small">📍 {r.address}</div> : null}
+            {bioOpenId === r.id ? (
+              <div className="confirm-box">
+                <label className="label">Police station / Commissariat</label>
+                <input
+                  className="input"
+                  placeholder="Station name"
+                  value={bio.stationName}
+                  onChange={(e) => setBio({ ...bio, stationName: e.target.value })}
+                />
+                <label className="label">Biometrics rendez-vous date</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={bio.rdvDate}
+                  onChange={(e) => setBio({ ...bio, rdvDate: e.target.value })}
+                />
+                <div className="actions">
+                  <button className="btn btn-green sm" onClick={() => addBio(r)} disabled={busy}>
+                    {busy ? "Saving…" : "Save Biometrics Date"}
+                  </button>
+                  <button className="btn btn-outline sm" onClick={() => setBioOpenId(null)} disabled={busy}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="actions">
+                <button className="btn btn-outline sm" onClick={() => openBio(r.id)}>
+                  Add Biometrics Date
+                </button>
+              </div>
+            )}
           </div>
         ))
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BIOMETRICS — police-station rendez-vous chosen by the client
+   ══════════════════════════════════════════════════════════════ */
+function Biometrics() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [editDate, setEditDate] = useState("");
+
+  const load = async () => {
+    setLoading(true);
+    setErr("");
+    try {
+      setRows(await api("listBiometrics"));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    load();
+  }, []);
+
+  const setStatus = async (id, status) => {
+    setBusy(true);
+    try {
+      await api("updateBiometrics", { id, status });
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveDate = async (id) => {
+    if (!editDate) return;
+    setBusy(true);
+    try {
+      await api("updateBiometrics", { id, rdvDate: editDate });
+      setEditId(null);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (id) => {
+    if (!confirm("Delete this biometrics rendez-vous?")) return;
+    setBusy(true);
+    try {
+      await api("deleteBiometrics", { id });
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remind = (b) => {
+    const text =
+      `Hello ${b.name}, this is a reminder of your biometrics appointment` +
+      (b.stationName ? ` at ${b.stationName}` : "") +
+      ` on ${fmtDate(b.rdvDate)}. Please attend on time with your documents. Thank you.\n\n` +
+      `Bonjour ${b.name}, rappel de votre rendez-vous biométrique` +
+      (b.stationName ? ` à ${b.stationName}` : "") +
+      ` le ${fmtDate(b.rdvDate)}. Merci d'apporter vos documents.`;
+    window.open(`https://wa.me/${digits(b.phone)}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  };
+
+  const sorted = useMemo(
+    () =>
+      [...rows]
+        .filter((b) => matches(search, b.name, b.phone))
+        .sort((a, b) => String(a.rdvDate).localeCompare(String(b.rdvDate))),
+    [rows, search]
+  );
+
+  const dueSoon = rows.filter((b) => {
+    const d = String(b.rdvDate).slice(0, 10);
+    return (d === TODAY || d === TOMORROW) && b.status !== "Done";
+  });
+
+  return (
+    <div>
+      {dueSoon.length > 0 && (
+        <div className="card">
+          <h3 className="card-title">Reminders Due / Rappels</h3>
+          {dueSoon.map((b) => {
+            const today = String(b.rdvDate).slice(0, 10) === TODAY;
+            return (
+              <div className={"item-head due-row" + (today ? " due-today" : " due-tomorrow")} key={"due-" + b.id}>
+                <div>
+                  <strong>{b.name}</strong>
+                  <div className="muted small">
+                    {today ? "TODAY" : "TOMORROW"} · {b.stationName || "—"} · {fmtDate(b.rdvDate)}
+                  </div>
+                </div>
+                <button className="btn btn-green sm" onClick={() => remind(b)} disabled={!b.phone}>
+                  Remind
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <input
+        className="input search"
+        placeholder="Search name or phone…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+
+      {err && <p className="error">{err}</p>}
+      {loading ? (
+        <Spinner />
+      ) : sorted.length === 0 ? (
+        <p className="muted center">No biometrics rendez-vous yet.</p>
+      ) : (
+        sorted.map((b) => {
+          const d = String(b.rdvDate).slice(0, 10);
+          const due = b.status !== "Done" && d === TODAY ? " due-today" : b.status !== "Done" && d === TOMORROW ? " due-tomorrow" : "";
+          return (
+            <div className={"card item" + due} key={b.id}>
+              <div className="item-head">
+                <strong>{b.name}</strong>
+                <Pill status={b.status} />
+              </div>
+              <div className="muted small">
+                🗓️ {fmtDate(b.rdvDate)} · 🏢 {b.stationName || "—"}
+              </div>
+              <div className="muted small">📞 {b.phone || "—"}</div>
+              {editId === b.id ? (
+                <div className="confirm-box">
+                  <label className="label">New rendez-vous date</label>
+                  <input
+                    className="input"
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                  />
+                  <div className="actions">
+                    <button className="btn btn-green sm" onClick={() => saveDate(b.id)} disabled={busy}>
+                      {busy ? "Saving…" : "Save Date"}
+                    </button>
+                    <button className="btn btn-outline sm" onClick={() => setEditId(null)} disabled={busy}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="actions">
+                  <button className="btn btn-green sm" onClick={() => remind(b)} disabled={!b.phone}>
+                    Remind on WhatsApp
+                  </button>
+                  {b.status !== "Done" && (
+                    <button className="btn btn-outline sm" onClick={() => setStatus(b.id, "Done")} disabled={busy}>
+                      Done
+                    </button>
+                  )}
+                  {b.status !== "Reminded" && b.status !== "Done" && (
+                    <button className="btn btn-outline sm" onClick={() => setStatus(b.id, "Reminded")} disabled={busy}>
+                      Mark Reminded
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-outline sm"
+                    onClick={() => {
+                      setEditId(b.id);
+                      setEditDate(String(b.rdvDate).slice(0, 10));
+                    }}
+                    disabled={busy}
+                  >
+                    Edit Date
+                  </button>
+                  <button className="btn btn-red sm" onClick={() => remove(b.id)} disabled={busy}>
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })
       )}
     </div>
   );
@@ -563,6 +820,7 @@ const TABS = [
   { key: "appointments", label: "Appointments" },
   { key: "submissions", label: "Submissions" },
   { key: "registered", label: "Registered" },
+  { key: "biometrics", label: "Biometrics" },
 ];
 
 export default function App() {
@@ -622,6 +880,7 @@ export default function App() {
         {tab === "appointments" && <Appointments />}
         {tab === "submissions" && <Submissions onRegistered={() => setRegRefresh((n) => n + 1)} />}
         {tab === "registered" && <Registered refreshKey={regRefresh} />}
+        {tab === "biometrics" && <Biometrics />}
       </main>
     </div>
   );
